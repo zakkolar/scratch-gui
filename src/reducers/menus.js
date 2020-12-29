@@ -6,6 +6,7 @@ const MENU_FILE = 'fileMenu';
 const MENU_EDIT = 'editMenu';
 const MENU_LANGUAGE = 'languageMenu';
 const MENU_LOGIN = 'loginMenu';
+const MENU_GOOGLE_DRIVE_ACCOUNT = 'googleDriveAccountMenu';
 
 
 const initialState = {
@@ -13,7 +14,8 @@ const initialState = {
     [MENU_FILE]: false,
     [MENU_EDIT]: false,
     [MENU_LANGUAGE]: false,
-    [MENU_LOGIN]: false
+    [MENU_LOGIN]: false,
+    [MENU_GOOGLE_DRIVE_ACCOUNT]: false,
 };
 
 const reducer = function (state, action) {
@@ -55,6 +57,10 @@ const openLoginMenu = () => openMenu(MENU_LOGIN);
 const closeLoginMenu = () => closeMenu(MENU_LOGIN);
 const loginMenuOpen = state => state.scratchGui.menus[MENU_LOGIN];
 
+const openGoogleDriveAccountMenu = () => openMenu(MENU_GOOGLE_DRIVE_ACCOUNT);
+const closeGoogleDriveAccountMenu = () => closeMenu(MENU_GOOGLE_DRIVE_ACCOUNT);
+const googleDriveAccountMenuOpen = state => state.scratchGui.menus[MENU_GOOGLE_DRIVE_ACCOUNT];
+
 export {
     reducer as default,
     initialState as menuInitialState,
@@ -72,5 +78,9 @@ export {
     languageMenuOpen,
     openLoginMenu,
     closeLoginMenu,
-    loginMenuOpen
+    loginMenuOpen,
+
+    openGoogleDriveAccountMenu,
+    closeGoogleDriveAccountMenu,
+    googleDriveAccountMenuOpen
 };

@@ -56,12 +56,18 @@ import {
     languageMenuOpen,
     openLoginMenu,
     closeLoginMenu,
-    loginMenuOpen
+    loginMenuOpen,
+
+    openGoogleDriveAccountMenu,
+    closeGoogleDriveAccountMenu,
+    googleDriveAccountMenuOpen
 } from '../../reducers/menus';
 
 import collectMetadata from '../../lib/collect-metadata';
 
 import styles from './menu-bar.css';
+
+import accountStyles from './account-nav.css';
 
 import helpIcon from '../../lib/assets/icon--tutorials.svg';
 import mystuffIcon from './icon--mystuff.png';
@@ -74,6 +80,15 @@ import aboutIcon from './icon--about.svg';
 import scratchLogo from './scratch-logo.svg';
 
 import sharedMessages from '../../lib/shared-messages';
+
+import SBFileUploaderGoogle from '../../containers/sb-file-google-loader.jsx';
+import {googleDriveLoaderMessages} from '../../containers/sb-file-google-loader.jsx';
+import GoogleLoginButton from './google-login-button.jsx';
+import Google from '../../Google.js';
+import MenuItemContainer from '../../containers/menu-item.jsx';
+
+import {googleDriveSignedIn, googleDriveName, googleSignIn, googleSignOut} from '../../reducers/google-drive';
+
 
 const ariaMessages = defineMessages({
     language: {
@@ -174,6 +189,7 @@ class MenuBar extends React.Component {
     }
     componentDidMount () {
         document.addEventListener('keydown', this.handleKeyPress);
+        Google.addSigninStatusChangeHandler(status => this.handleGoogleLoginStatusChange(status));
     }
     componentWillUnmount () {
         document.removeEventListener('keydown', this.handleKeyPress);
@@ -283,6 +299,27 @@ class MenuBar extends React.Component {
         }
         }
     }
+
+    handleClickGoogleSignout (){
+        Google.getGapi().auth2.getAuthInstance().signOut();
+    }
+
+    handleGoogleLoginStatusChange (signedIn){
+
+        let name = null;
+
+        if (signedIn){
+            const profile = Google.getGapi().auth2.getAuthInstance().currentUser.get().getBasicProfile();
+            name = profile.getName();
+            this.props.onRequestGoogleSignIn(name);
+        } else {
+            this.props.onRequestGoogleSignOut();
+            this.props.onRequestCloseGoogleDriveAccount();
+        }
+
+
+    }
+
     render () {
         const saveNowMessage = (
             <FormattedMessage
@@ -407,6 +444,24 @@ class MenuBar extends React.Component {
                                             )}
                                         </MenuSection>
                                     )}
+                                    <MenuSection>
+                                        <SBFileUploaderGoogle
+                                            canSave={this.props.canSave}
+                                            userOwnsProject={this.props.userOwnsProject}
+                                        >
+                                            {(className, renderFileInput, handleLoadProject) => (
+                                                <MenuItem
+                                                    className={className}
+                                                    onClick={handleLoadProject}
+                                                >
+                                                    {/* eslint-disable max-len */}
+                                                    {this.props.intl.formatMessage(googleDriveLoaderMessages.loadFromGoogleTitle)}
+                                                    {/* eslint-enable max-len */}
+                                                    {renderFileInput()}
+                                                </MenuItem>
+                                            )}
+                                        </SBFileUploaderGoogle>
+                                    </MenuSection>
                                     <MenuSection>
                                         <SBFileUploader
                                             canSave={this.props.canSave}
@@ -550,30 +605,6 @@ class MenuBar extends React.Component {
                         )}
                         {this.props.canRemix ? remixButton : []}
                     </div>
-                    <div className={classNames(styles.menuBarItem, styles.communityButtonWrapper)}>
-                        {this.props.enableCommunity ? (
-                            (this.props.isShowingProject || this.props.isUpdating) && (
-                                <ProjectWatcher onDoneUpdating={this.props.onSeeCommunity}>
-                                    {
-                                        waitForUpdate => (
-                                            <CommunityButton
-                                                className={styles.menuBarButton}
-                                                /* eslint-disable react/jsx-no-bind */
-                                                onClick={() => {
-                                                    this.handleClickSeeCommunity(waitForUpdate);
-                                                }}
-                                                /* eslint-enable react/jsx-no-bind */
-                                            />
-                                        )
-                                    }
-                                </ProjectWatcher>
-                            )
-                        ) : (this.props.showComingSoon ? (
-                            <MenuBarItemTooltip id="community-button">
-                                <CommunityButton className={styles.menuBarButton} />
-                            </MenuBarItemTooltip>
-                        ) : [])}
-                    </div>
                 </div>
 
                 {/* show the proper UI in the account menu, given whether the user is
@@ -584,11 +615,10 @@ class MenuBar extends React.Component {
                             <SaveStatus />
                         )}
                     </div>
-                    {this.props.sessionExists ? (
-                        this.props.username ? (
-                            // ************ user is logged in ************
-                            <React.Fragment>
-                                <a href="/mystuff/">
+                    {this.props.googleDriveSignedIn ? (
+                        <React.Fragment>
+                            <MenuBarItemTooltip id="my-stuff-button">
+                                <a href="#">
                                     <div
                                         className={classNames(
                                             styles.menuBarItem,
@@ -602,107 +632,62 @@ class MenuBar extends React.Component {
                                         />
                                     </div>
                                 </a>
-                                <AccountNav
-                                    className={classNames(
-                                        styles.menuBarItem,
-                                        styles.hoverable,
-                                        {[styles.active]: this.props.accountMenuOpen}
-                                    )}
-                                    isOpen={this.props.accountMenuOpen}
-                                    isRtl={this.props.isRtl}
-                                    menuBarMenuClassName={classNames(styles.menuBarMenu)}
-                                    onClick={this.props.onClickAccount}
-                                    onClose={this.props.onRequestCloseAccount}
-                                    onLogOut={this.props.onLogOut}
-                                />
-                            </React.Fragment>
-                        ) : (
-                            // ********* user not logged in, but a session exists
-                            // ********* so they can choose to log in
-                            <React.Fragment>
-                                <div
-                                    className={classNames(
-                                        styles.menuBarItem,
-                                        styles.hoverable
-                                    )}
-                                    key="join"
-                                    onMouseUp={this.props.onOpenRegistration}
-                                >
-                                    <FormattedMessage
-                                        defaultMessage="Join Scratch"
-                                        description="Link for creating a Scratch account"
-                                        id="gui.menuBar.joinScratch"
+                            </MenuBarItemTooltip>
+
+                            <div
+                                className={classNames(
+                                    accountStyles.userInfo,
+                                    styles.menuBarItem,
+                                    styles.hoverable,
+                                    {[styles.active]: this.props.accountMenuOpen}
+                                )}
+                                onMouseUp={this.props.onClickGoogleAccount}
+                            >
+
+                                <span className={accountStyles.profileName}>
+                                    {this.props.googleDriveName}
+                                </span>
+                                <div className={accountStyles.dropdownCaretPosition}>
+                                    <img
+                                        className={accountStyles.dropdownCaretIcon}
+                                        src={dropdownCaret}
                                     />
                                 </div>
-                                <div
-                                    className={classNames(
-                                        styles.menuBarItem,
-                                        styles.hoverable
-                                    )}
-                                    key="login"
-                                    onMouseUp={this.props.onClickLogin}
-                                >
-                                    <FormattedMessage
-                                        defaultMessage="Sign in"
-                                        description="Link for signing in to your Scratch account"
-                                        id="gui.menuBar.signIn"
-                                    />
-                                    <LoginDropdown
-                                        className={classNames(styles.menuBarMenu)}
-                                        isOpen={this.props.loginMenuOpen}
-                                        isRtl={this.props.isRtl}
-                                        renderLogin={this.props.renderLogin}
-                                        onClose={this.props.onRequestCloseLogin}
-                                    />
-                                </div>
-                            </React.Fragment>
-                        )
-                    ) : (
-                        // ******** no login session is available, so don't show login stuff
-                        <React.Fragment>
-                            {this.props.showComingSoon ? (
-                                <React.Fragment>
-                                    <MenuBarItemTooltip id="mystuff">
-                                        <div
-                                            className={classNames(
-                                                styles.menuBarItem,
-                                                styles.hoverable,
-                                                styles.mystuffButton
-                                            )}
-                                        >
-                                            <img
-                                                className={styles.mystuffIcon}
-                                                src={mystuffIcon}
-                                            />
-                                        </div>
-                                    </MenuBarItemTooltip>
-                                    <MenuBarItemTooltip
-                                        id="account-nav"
-                                        place={this.props.isRtl ? 'right' : 'left'}
-                                    >
-                                        <div
-                                            className={classNames(
-                                                styles.menuBarItem,
-                                                styles.hoverable,
-                                                styles.accountNavMenu
-                                            )}
-                                        >
-                                            <img
-                                                className={styles.profileIcon}
-                                                src={profileIcon}
-                                            />
-                                            <span>
-                                                {'scratch-cat'}
-                                            </span>
-                                            <img
-                                                className={styles.dropdownCaretIcon}
-                                                src={dropdownCaret}
-                                            />
-                                        </div>
-                                    </MenuBarItemTooltip>
-                                </React.Fragment>
-                            ) : []}
+                            </div>
+
+                            <MenuBarMenu
+                                className={classNames(styles.menuBarMenu)}
+                                open={this.props.googleDriveAccountMenuOpen}
+                                // note: the Rtl styles are switched here, because this menu is justified
+                                // opposite all the others
+                                place={this.props.isRtl ? 'right' : 'left'}
+                                onRequestClose={this.props.onRequestCloseGoogleDriveAccount}
+                            >
+                                <MenuSection>
+                                    <MenuItemContainer onClick={this.handleClickGoogleSignout}>
+                                        <FormattedMessage
+                                            defaultMessage="Sign out"
+                                            description="Link for signing out of your Google account"
+                                            id="gui.menuBar.signOut"
+                                        />
+                                    </MenuItemContainer>
+                                </MenuSection>
+                            </MenuBarMenu>
+
+
                         </React.Fragment>
+                    ) : (
+                    // ******** no login session is available, so don't show login stuff
+
+                        <GoogleLoginButton
+                            clientId="472190606629-m9iat71q49415ght3ftctumovpl8f3a2.apps.googleusercontent.com"
+                            buttonText={this.props.intl.formatMessage({
+                                defaultMessage: 'Sign in with Google',
+                                description: 'Button for user to grant access to their Google account',
+                                id: 'gui.menuBar.signInWithGoogleButton'
+                            })}
+                        />
+
                     )}
                 </div>
 
@@ -770,7 +755,16 @@ MenuBar.propTypes = {
     showComingSoon: PropTypes.bool,
     userOwnsProject: PropTypes.bool,
     username: PropTypes.string,
-    vm: PropTypes.instanceOf(VM).isRequired
+    vm: PropTypes.instanceOf(VM).isRequired,
+
+    googleDriveAccountMenuOpen: PropTypes.bool,
+    onClickGoogleAccount: PropTypes.func,
+    onRequestCloseGoogleDriveAccount: PropTypes.func,
+
+    googleDriveSignedIn: PropTypes.bool,
+    googleDriveName: PropTypes.string,
+    onRequestGoogleSignIn: PropTypes.func,
+    onRequestGoogleSignOut: PropTypes.func
 };
 
 MenuBar.defaultProps = {
@@ -793,10 +787,12 @@ const mapStateToProps = (state, ownProps) => {
         loginMenuOpen: loginMenuOpen(state),
         projectTitle: state.scratchGui.projectTitle,
         sessionExists: state.session && typeof state.session.session !== 'undefined',
-        username: user ? user.username : null,
         userOwnsProject: ownProps.authorUsername && user &&
             (ownProps.authorUsername === user.username),
-        vm: state.scratchGui.vm
+        vm: state.scratchGui.vm,
+        googleDriveAccountMenuOpen: googleDriveAccountMenuOpen(state),
+        googleDriveSignedIn: googleDriveSignedIn(state),
+        googleDriveName: googleDriveName(state)
     };
 };
 
@@ -817,7 +813,13 @@ const mapDispatchToProps = dispatch => ({
     onClickRemix: () => dispatch(remixProject()),
     onClickSave: () => dispatch(manualUpdateProject()),
     onClickSaveAsCopy: () => dispatch(saveProjectAsCopy()),
-    onSeeCommunity: () => dispatch(setPlayer(true))
+    onSeeCommunity: () => dispatch(setPlayer(true)),
+
+    onClickGoogleAccount: () => dispatch(openGoogleDriveAccountMenu()),
+    onRequestCloseGoogleDriveAccount: () => dispatch(closeGoogleDriveAccountMenu()),
+
+    onRequestGoogleSignIn: name => dispatch(googleSignIn(name)),
+    onRequestGoogleSignOut: () => dispatch(googleSignOut())
 });
 
 export default compose(

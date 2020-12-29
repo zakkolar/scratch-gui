@@ -6,6 +6,7 @@ var webpack = require('webpack');
 var CopyWebpackPlugin = require('copy-webpack-plugin');
 var HtmlWebpackPlugin = require('html-webpack-plugin');
 var UglifyJsPlugin = require('uglifyjs-webpack-plugin');
+var Dotenv = require('dotenv-webpack');
 
 // PostCss
 var autoprefixer = require('autoprefixer');
@@ -92,7 +93,9 @@ const base = {
             })
         ]
     },
-    plugins: []
+    plugins: [
+        new Dotenv()
+    ]
 };
 
 if (!process.env.CI) {
