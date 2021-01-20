@@ -38,6 +38,8 @@ import cloudManagerHOC from '../lib/cloud-manager-hoc.jsx';
 
 import GUIComponent from '../components/gui/gui.jsx';
 import {setIsScratchDesktop} from '../lib/isScratchDesktop.js';
+import googleManagerHOC from '../lib/google-manager-hoc.jsx';
+import HashParserHOC from '../lib/hash-parser-hoc.jsx';
 
 class GUI extends React.Component {
     componentDidMount () {
@@ -174,6 +176,8 @@ const ConnectedGUI = injectIntl(connect(
 const WrappedGui = compose(
     LocalizationHOC,
     ErrorBoundaryHOC('Top Level App'),
+    googleManagerHOC,
+    HashParserHOC,
     FontLoaderHOC,
     QueryParserHOC,
     ProjectFetcherHOC,

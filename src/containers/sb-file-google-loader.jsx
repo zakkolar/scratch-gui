@@ -13,7 +13,7 @@ import {
     getIsLoadingUpload,
     getIsShowingWithoutId,
     onLoadedProject,
-    requestProjectUpload
+    requestProjectUpload, setProjectId
 } from '../reducers/project-state';
 
 import {
@@ -23,6 +23,8 @@ import {
 import {
     closeFileMenu
 } from '../reducers/menus';
+
+import Google from '../Google';
 
 /**
  * SBFileUploader component passes a file input, load handler and props to its child.
@@ -41,13 +43,6 @@ import {
  * )}</SBFileUploader>
  */
 
-const messages = defineMessages({
-    loadError: {
-        id: 'gui.projectLoader.loadError',
-        defaultMessage: 'The project file that was selected failed to load.',
-        description: 'An error that displays when a local project file fails to load.'
-    }
-});
 
 export const googleDriveLoaderMessages = defineMessages({
     loadFromGoogleTitle: {
@@ -61,119 +56,26 @@ class SBFileGoogleLoader extends React.Component {
     constructor (props) {
         super(props);
         bindAll(this, [
-            'getProjectTitleFromFilename',
-            'renderFileInput',
-            'setFileInput',
-            'handleChange',
-            'handleClick',
-            'onload',
-            'resetFileInput'
+            'handleChooseFile',
+            'handleClick'
         ]);
     }
-    componentWillMount () {
-        this.reader = new FileReader();
-        this.reader.onload = this.onload;
-        this.resetFileInput();
-    }
-    componentDidUpdate (prevProps) {
-        if (this.props.isLoadingUpload && !prevProps.isLoadingUpload && this.fileToUpload && this.reader) {
-            this.reader.readAsArrayBuffer(this.fileToUpload);
-        }
-    }
-    componentWillUnmount () {
-        this.reader = null;
-        this.resetFileInput();
-    }
-    resetFileInput () {
-        this.fileToUpload = null;
-        if (this.fileInput) {
-            this.fileInput.value = null;
-        }
-    }
-    getProjectTitleFromFilename (fileInputFilename) {
-        if (!fileInputFilename) return '';
-        // only parse title with valid scratch project extensions
-        // (.sb, .sb2, and .sb3)
-        const matches = fileInputFilename.match(/^(.*)\.sb[23]?$/);
-        if (!matches) return '';
-        return matches[1].substring(0, 100); // truncate project title to max 100 chars
-    }
+
+
     // called when user has finished selecting a file to upload
-    handleChange (e) {
-        const {
-            intl,
-            isShowingWithoutId,
-            loadingState,
-            projectChanged,
-            userOwnsProject
-        } = this.props;
+    handleChooseFile (data) {
+        const file = Google.getPickedFileInfo(data);
+        this.props.setProjectId(file.id);
+        this.props.closeFileMenu();
 
-        const thisFileInput = e.target;
-        if (thisFileInput.files) { // Don't attempt to load if no file was selected
-            this.fileToUpload = thisFileInput.files[0];
+    }
 
-            // If user owns the project, or user has changed the project,
-            // we must confirm with the user that they really intend to replace it.
-            // (If they don't own the project and haven't changed it, no need to confirm.)
-            let uploadAllowed = true;
-            if (userOwnsProject || (projectChanged && isShowingWithoutId)) {
-                uploadAllowed = confirm( // eslint-disable-line no-alert
-                    intl.formatMessage(sharedMessages.replaceProjectWarning)
-                );
-            }
-            if (uploadAllowed) {
-                this.props.requestProjectUpload(loadingState);
-            } else {
-                this.props.closeFileMenu();
-            }
-        }
-    }
-    // called when file upload raw data is available in the reader
-    onload () {
-        if (this.reader) {
-            this.props.onLoadingStarted();
-            const filename = this.fileToUpload && this.fileToUpload.name;
-            this.props.vm.loadProject(this.reader.result)
-                .then(() => {
-                    this.props.onLoadingFinished(this.props.loadingState, true);
-                    // Reset the file input after project is loaded
-                    // This is necessary in case the user wants to reload a project
-                    if (filename) {
-                        const uploadedProjectTitle = this.getProjectTitleFromFilename(filename);
-                        this.props.onReceivedProjectTitle(uploadedProjectTitle);
-                    }
-                    this.resetFileInput();
-                })
-                .catch(error => {
-                    log.warn(error);
-                    alert(this.props.intl.formatMessage(messages.loadError)); // eslint-disable-line no-alert
-                    this.props.onLoadingFinished(this.props.loadingState, false);
-                    // Reset the file input after project is loaded
-                    // This is necessary in case the user wants to reload a project
-                    this.resetFileInput();
-                });
-        }
-    }
     handleClick () {
-        // open filesystem browsing window
-        this.fileInput.click();
+        Google.showPicker(this.handleChooseFile);
     }
-    setFileInput (input) {
-        this.fileInput = input;
-    }
-    renderFileInput () {
-        return (
-            <input
-                accept=".sb,.sb2,.sb3"
-                ref={this.setFileInput}
-                style={{display: 'none'}}
-                type="file"
-                onChange={this.handleChange}
-            />
-        );
-    }
+
     render () {
-        return this.props.children(this.props.className, this.renderFileInput, this.handleClick);
+        return this.props.children(this.props.className, this.handleClick);
     }
 }
 
@@ -182,19 +84,10 @@ SBFileGoogleLoader.propTypes = {
     children: PropTypes.func,
     className: PropTypes.string,
     closeFileMenu: PropTypes.func,
-    intl: intlShape.isRequired,
-    isLoadingUpload: PropTypes.bool,
-    isShowingWithoutId: PropTypes.bool,
-    loadingState: PropTypes.oneOf(LoadingStates),
-    onLoadingFinished: PropTypes.func,
-    onLoadingStarted: PropTypes.func,
-    projectChanged: PropTypes.bool,
-    requestProjectUpload: PropTypes.func,
-    onReceivedProjectTitle: PropTypes.func,
-    userOwnsProject: PropTypes.bool,
     vm: PropTypes.shape({
         loadProject: PropTypes.func
-    })
+    }),
+    setProjectId: PropTypes.func
 };
 SBFileGoogleLoader.defaultProps = {
     className: ''
@@ -219,7 +112,10 @@ const mapDispatchToProps = (dispatch, ownProps) => ({
     },
     requestProjectUpload: loadingState => dispatch(requestProjectUpload(loadingState)),
     onLoadingStarted: () => dispatch(openLoadingProject()),
-    onReceivedProjectTitle: title => dispatch(setProjectTitle(title))
+    onReceivedProjectTitle: title => dispatch(setProjectTitle(title)),
+    setProjectId: projectId => {
+        dispatch(setProjectId(projectId));
+    }
 });
 
 // Allow incoming props to override redux-provided props. Used to mock in tests.

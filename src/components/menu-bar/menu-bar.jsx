@@ -11,7 +11,6 @@ import VM from 'scratch-vm';
 
 import Box from '../box/box.jsx';
 import Button from '../button/button.jsx';
-import CommunityButton from './community-button.jsx';
 import ShareButton from './share-button.jsx';
 import {ComingSoonTooltip} from '../coming-soon/coming-soon.jsx';
 import Divider from '../divider/divider.jsx';
@@ -23,8 +22,6 @@ import MenuBarMenu from './menu-bar-menu.jsx';
 import {MenuItem, MenuSection} from '../menu/menu.jsx';
 import ProjectTitleInput from './project-title-input.jsx';
 import AuthorInfo from './author-info.jsx';
-import AccountNav from '../../containers/account-nav.jsx';
-import LoginDropdown from './login-dropdown.jsx';
 import SB3Downloader from '../../containers/sb3-downloader.jsx';
 import DeletionRestorer from '../../containers/deletion-restorer.jsx';
 import TurboMode from '../../containers/turbo-mode.jsx';
@@ -71,7 +68,6 @@ import accountStyles from './account-nav.css';
 
 import helpIcon from '../../lib/assets/icon--tutorials.svg';
 import mystuffIcon from './icon--mystuff.png';
-import profileIcon from './icon--profile.png';
 import remixIcon from './icon--remix.svg';
 import dropdownCaret from './dropdown-caret.svg';
 import languageIcon from '../language-selector/language-icon.svg';
@@ -83,11 +79,11 @@ import sharedMessages from '../../lib/shared-messages';
 
 import SBFileUploaderGoogle from '../../containers/sb-file-google-loader.jsx';
 import {googleDriveLoaderMessages} from '../../containers/sb-file-google-loader.jsx';
-import GoogleLoginButton from './google-login-button.jsx';
+
 import Google from '../../Google.js';
 import MenuItemContainer from '../../containers/menu-item.jsx';
 
-import {googleDriveSignedIn, googleDriveName, googleSignIn, googleSignOut} from '../../reducers/google-drive';
+import {googleDriveSignedIn, googleDriveName } from '../../reducers/google-drive';
 
 
 const ariaMessages = defineMessages({
@@ -184,12 +180,12 @@ class MenuBar extends React.Component {
             'handleLanguageMouseUp',
             'handleRestoreOption',
             'getSaveToComputerHandler',
-            'restoreOptionMessage'
+            'restoreOptionMessage',
+            'handleClickGoogleSignout'
         ]);
     }
     componentDidMount () {
         document.addEventListener('keydown', this.handleKeyPress);
-        Google.addSigninStatusChangeHandler(status => this.handleGoogleLoginStatusChange(status));
     }
     componentWillUnmount () {
         document.removeEventListener('keydown', this.handleKeyPress);
@@ -302,23 +298,9 @@ class MenuBar extends React.Component {
 
     handleClickGoogleSignout (){
         Google.getGapi().auth2.getAuthInstance().signOut();
+        this.props.onRequestCloseGoogleDriveAccount();
     }
 
-    handleGoogleLoginStatusChange (signedIn){
-
-        let name = null;
-
-        if (signedIn){
-            const profile = Google.getGapi().auth2.getAuthInstance().currentUser.get().getBasicProfile();
-            name = profile.getName();
-            this.props.onRequestGoogleSignIn(name);
-        } else {
-            this.props.onRequestGoogleSignOut();
-            this.props.onRequestCloseGoogleDriveAccount();
-        }
-
-
-    }
 
     render () {
         const saveNowMessage = (
@@ -444,24 +426,25 @@ class MenuBar extends React.Component {
                                             )}
                                         </MenuSection>
                                     )}
-                                    <MenuSection>
-                                        <SBFileUploaderGoogle
-                                            canSave={this.props.canSave}
-                                            userOwnsProject={this.props.userOwnsProject}
-                                        >
-                                            {(className, renderFileInput, handleLoadProject) => (
-                                                <MenuItem
-                                                    className={className}
-                                                    onClick={handleLoadProject}
-                                                >
-                                                    {/* eslint-disable max-len */}
-                                                    {this.props.intl.formatMessage(googleDriveLoaderMessages.loadFromGoogleTitle)}
-                                                    {/* eslint-enable max-len */}
-                                                    {renderFileInput()}
-                                                </MenuItem>
-                                            )}
-                                        </SBFileUploaderGoogle>
-                                    </MenuSection>
+                                    { (this.props.googleDriveSignedIn) && (
+                                        <MenuSection>
+                                            <SBFileUploaderGoogle
+                                                canSave={this.props.canSave}
+                                                userOwnsProject={this.props.userOwnsProject}
+                                            >
+                                                {(className, handleLoadProject) => (
+                                                    <MenuItem
+                                                        className={className}
+                                                        onClick={handleLoadProject}
+                                                    >
+                                                        {/* eslint-disable max-len */}
+                                                        {this.props.intl.formatMessage(googleDriveLoaderMessages.loadFromGoogleTitle)}
+                                                        {/* eslint-enable max-len */}
+                                                    </MenuItem>
+                                                )}
+                                            </SBFileUploaderGoogle>
+                                        </MenuSection>
+                                    )}
                                     <MenuSection>
                                         <SBFileUploader
                                             canSave={this.props.canSave}
@@ -615,10 +598,17 @@ class MenuBar extends React.Component {
                             <SaveStatus />
                         )}
                     </div>
-                    {this.props.googleDriveSignedIn ? (
-                        <React.Fragment>
-                            <MenuBarItemTooltip id="my-stuff-button">
-                                <a href="#">
+                    <React.Fragment>
+
+                        <SBFileUploaderGoogle
+                            canSave={this.props.canSave}
+                            userOwnsProject={this.props.userOwnsProject}
+                        >
+                            {(className, handleLoadProject) => (
+                                <a
+                                    className={className}
+                                    onClick={handleLoadProject}
+                                >
                                     <div
                                         className={classNames(
                                             styles.menuBarItem,
@@ -632,63 +622,53 @@ class MenuBar extends React.Component {
                                         />
                                     </div>
                                 </a>
-                            </MenuBarItemTooltip>
+                            )}
+                        </SBFileUploaderGoogle>
 
-                            <div
-                                className={classNames(
-                                    accountStyles.userInfo,
-                                    styles.menuBarItem,
-                                    styles.hoverable,
-                                    {[styles.active]: this.props.accountMenuOpen}
-                                )}
-                                onMouseUp={this.props.onClickGoogleAccount}
-                            >
 
-                                <span className={accountStyles.profileName}>
-                                    {this.props.googleDriveName}
-                                </span>
-                                <div className={accountStyles.dropdownCaretPosition}>
-                                    <img
-                                        className={accountStyles.dropdownCaretIcon}
-                                        src={dropdownCaret}
-                                    />
-                                </div>
+                        <div
+                            className={classNames(
+                                accountStyles.userInfo,
+                                styles.menuBarItem,
+                                styles.hoverable,
+                                {[styles.active]: this.props.accountMenuOpen}
+                            )}
+                            onMouseUp={this.props.onClickGoogleAccount}
+                        >
+
+                            <span className={accountStyles.profileName}>
+                                {this.props.googleDriveName}
+                            </span>
+                            <div className={accountStyles.dropdownCaretPosition}>
+                                <img
+                                    className={accountStyles.dropdownCaretIcon}
+                                    src={dropdownCaret}
+                                />
                             </div>
+                        </div>
 
-                            <MenuBarMenu
-                                className={classNames(styles.menuBarMenu)}
-                                open={this.props.googleDriveAccountMenuOpen}
-                                // note: the Rtl styles are switched here, because this menu is justified
-                                // opposite all the others
-                                place={this.props.isRtl ? 'right' : 'left'}
-                                onRequestClose={this.props.onRequestCloseGoogleDriveAccount}
-                            >
-                                <MenuSection>
-                                    <MenuItemContainer onClick={this.handleClickGoogleSignout}>
-                                        <FormattedMessage
-                                            defaultMessage="Sign out"
-                                            description="Link for signing out of your Google account"
-                                            id="gui.menuBar.signOut"
-                                        />
-                                    </MenuItemContainer>
-                                </MenuSection>
-                            </MenuBarMenu>
+                        <MenuBarMenu
+                            className={classNames(styles.menuBarMenu)}
+                            open={this.props.googleDriveAccountMenuOpen}
+                            // note: the Rtl styles are switched here, because this menu is justified
+                            // opposite all the others
+                            place={this.props.isRtl ? 'right' : 'left'}
+                            onRequestClose={this.props.onRequestCloseGoogleDriveAccount}
+                        >
+                            <MenuSection>
+                                <MenuItemContainer onClick={this.handleClickGoogleSignout}>
+                                    <FormattedMessage
+                                        defaultMessage="Sign out"
+                                        description="Link for signing out of your Google account"
+                                        id="gui.menuBar.signOut"
+                                    />
+                                </MenuItemContainer>
+                            </MenuSection>
+                        </MenuBarMenu>
 
 
-                        </React.Fragment>
-                    ) : (
-                    // ******** no login session is available, so don't show login stuff
+                    </React.Fragment>
 
-                        <GoogleLoginButton
-                            clientId="472190606629-m9iat71q49415ght3ftctumovpl8f3a2.apps.googleusercontent.com"
-                            buttonText={this.props.intl.formatMessage({
-                                defaultMessage: 'Sign in with Google',
-                                description: 'Button for user to grant access to their Google account',
-                                id: 'gui.menuBar.signInWithGoogleButton'
-                            })}
-                        />
-
-                    )}
                 </div>
 
                 {aboutButton}
@@ -763,8 +743,6 @@ MenuBar.propTypes = {
 
     googleDriveSignedIn: PropTypes.bool,
     googleDriveName: PropTypes.string,
-    onRequestGoogleSignIn: PropTypes.func,
-    onRequestGoogleSignOut: PropTypes.func
 };
 
 MenuBar.defaultProps = {
@@ -816,10 +794,7 @@ const mapDispatchToProps = dispatch => ({
     onSeeCommunity: () => dispatch(setPlayer(true)),
 
     onClickGoogleAccount: () => dispatch(openGoogleDriveAccountMenu()),
-    onRequestCloseGoogleDriveAccount: () => dispatch(closeGoogleDriveAccountMenu()),
-
-    onRequestGoogleSignIn: name => dispatch(googleSignIn(name)),
-    onRequestGoogleSignOut: () => dispatch(googleSignOut())
+    onRequestCloseGoogleDriveAccount: () => dispatch(closeGoogleDriveAccountMenu())
 });
 
 export default compose(

@@ -13,7 +13,8 @@ import {
     getIsShowingProject,
     onFetchedProjectData,
     projectError,
-    setProjectId
+    setProjectId,
+    defaultProjectId
 } from '../reducers/project-state';
 import {
     activateTab,
@@ -22,6 +23,8 @@ import {
 
 import log from './log';
 import storage from './storage';
+import Google from '../Google';
+import {setProjectTitle} from '../reducers/project-title';
 
 /* Higher Order Component to provide behavior for loading projects by id. If
  * there's no id, the default project is loaded.
@@ -33,7 +36,8 @@ const ProjectFetcherHOC = function (WrappedComponent) {
         constructor (props) {
             super(props);
             bindAll(this, [
-                'fetchProject'
+                'fetchProject',
+                'getProjectTitleFromFilename'
             ]);
             storage.setProjectHost(props.projectHost);
             storage.setAssetHost(props.assetHost);
@@ -68,21 +72,57 @@ const ProjectFetcherHOC = function (WrappedComponent) {
             }
         }
         fetchProject (projectId, loadingState) {
-            return storage
-                .load(storage.AssetType.Project, projectId, storage.DataFormat.JSON)
+
+            if (this.props.reduxProjectId === defaultProjectId) {
+                history.replaceState('new-project', 'new-project',
+                    window.location.pathname + window.location.search);
+            } else if (this.props.reduxProjectId) {
+                history.replaceState('new-project', 'new-project',
+                    `${window.location.pathname}#${this.props.reduxProjectId}`);
+            }
+
+            if (projectId === defaultProjectId) {
+                return storage
+                    .load(storage.AssetType.Project, projectId, storage.DataFormat.JSON)
+                    .then(projectAsset => {
+                        if (projectAsset) {
+                            this.props.onFetchedProjectData(projectAsset.data, loadingState);
+                        } else {
+                            // Treat failure to load as an error
+                            // Throw to be caught by catch later on
+                            throw new Error('Could not find project');
+                        }
+                    })
+                    .catch(err => {
+                        this.props.onError(err);
+                        log.error(err);
+                    });
+            }
+
+            return Google.downloadFile(projectId)
                 .then(projectAsset => {
-                    if (projectAsset) {
-                        this.props.onFetchedProjectData(projectAsset.data, loadingState);
-                    } else {
-                        // Treat failure to load as an error
-                        // Throw to be caught by catch later on
-                        throw new Error('Could not find project');
-                    }
+                    Google.getFileInfo(projectId).then(file => {
+                        const projectTitle = this.getProjectTitleFromFilename(file.name);
+                        this.props.onFetchedProjectData(projectAsset, loadingState);
+                        this.props.onReceivedProjectTitle(projectTitle);
+                    },
+                    e => {
+                        console.log(e);
+                    });
                 })
                 .catch(err => {
-                    this.props.onError(err);
-                    log.error(err);
+                    console.log(err.status);
                 });
+
+
+        }
+        getProjectTitleFromFilename (fileInputFilename) {
+            if (!fileInputFilename) return '';
+            // only parse title with valid scratch project extensions
+            // (.sb, .sb2, and .sb3)
+            const matches = fileInputFilename.match(/^(.*)\.sb[23]?$/);
+            if (!matches) return '';
+            return matches[1].substring(0, 100); // truncate project title to max 100 chars
         }
         render () {
             const {
@@ -101,6 +141,7 @@ const ProjectFetcherHOC = function (WrappedComponent) {
                 setProjectId: setProjectIdProp,
                 /* eslint-enable no-unused-vars */
                 isFetchingWithId: isFetchingWithIdProp,
+                onReceivedProjectTitle,
                 ...componentProps
             } = this.props;
             return (
@@ -127,7 +168,8 @@ const ProjectFetcherHOC = function (WrappedComponent) {
         projectHost: PropTypes.string,
         projectId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
         reduxProjectId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-        setProjectId: PropTypes.func
+        setProjectId: PropTypes.func,
+        onReceivedProjectTitle: PropTypes.func,
     };
     ProjectFetcherComponent.defaultProps = {
         assetHost: 'https://assets.scratch.mit.edu',
@@ -148,7 +190,8 @@ const ProjectFetcherHOC = function (WrappedComponent) {
         onFetchedProjectData: (projectData, loadingState) =>
             dispatch(onFetchedProjectData(projectData, loadingState)),
         setProjectId: projectId => dispatch(setProjectId(projectId)),
-        onProjectUnchanged: () => dispatch(setProjectUnchanged())
+        onProjectUnchanged: () => dispatch(setProjectUnchanged()),
+        onReceivedProjectTitle: title => dispatch(setProjectTitle(title))
     });
     // Allow incoming props to override redux-provided props. Used to mock in tests.
     const mergeProps = (stateProps, dispatchProps, ownProps) => Object.assign(

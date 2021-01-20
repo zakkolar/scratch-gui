@@ -136,7 +136,7 @@ class GoogleLoginButton extends Component {
             paddingLeft: 12,
             paddingRight: 12,
             borderRadius: 2,
-            border: '1px solid transparent',
+            border: '1px solid ',
             fontSize: 13,
             lineHeight: 1.8,
             fontFamily: 'Roboto, sans-serif',

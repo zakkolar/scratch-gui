@@ -36,7 +36,7 @@ export default appTarget => {
     // ability to compose reducers.
     const WrappedGui = compose(
         AppStateHOC,
-        HashParserHOC
+        // HashParserHOC
     )(GUI);
 
     // TODO a hack for testing the backpack, allow backpack host to be set by url param

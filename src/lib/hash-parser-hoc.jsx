@@ -18,7 +18,8 @@ const HashParserHOC = function (WrappedComponent) {
         constructor (props) {
             super(props);
             bindAll(this, [
-                'handleHashChange'
+                'handleHashChange',
+                'getHash'
             ]);
         }
         componentDidMount () {
@@ -26,20 +27,31 @@ const HashParserHOC = function (WrappedComponent) {
             this.handleHashChange();
         }
         componentDidUpdate (prevProps) {
+
+
+
             // if we are newly fetching a non-hash project...
-            if (this.props.isFetchingWithoutId && !prevProps.isFetchingWithoutId) {
-                // ...clear the hash from the url
-                history.pushState('new-project', 'new-project',
-                    window.location.pathname + window.location.search);
-            }
+            // if (this.props.isFetchingWithoutId && !prevProps.isFetchingWithoutId) {
+            //     // ...clear the hash from the url
+            //     history.pushState('new-project', 'new-project',
+            //         window.location.pathname + window.location.search);
+            // }
+
+
         }
         componentWillUnmount () {
             window.removeEventListener('hashchange', this.handleHashChange);
         }
         handleHashChange () {
-            const hashMatch = window.location.hash.match(/#(\d+)/);
+            const hashMatch = this.getHash();
+
             const hashProjectId = hashMatch === null ? defaultProjectId : hashMatch[1];
+
+
             this.props.setProjectId(hashProjectId.toString());
+        }
+        getHash (){
+            return window.location.hash.match(/#([-\w]+)/);
         }
         render () {
             const {
