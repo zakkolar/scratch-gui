@@ -25,6 +25,7 @@ import log from './log';
 import storage from './storage';
 import Google from '../Google';
 import {setProjectTitle} from '../reducers/project-title';
+import {googleLoadProject} from '../reducers/google-drive';
 
 /* Higher Order Component to provide behavior for loading projects by id. If
  * there's no id, the default project is loaded.
@@ -105,6 +106,7 @@ const ProjectFetcherHOC = function (WrappedComponent) {
                         const projectTitle = this.getProjectTitleFromFilename(file.name);
                         this.props.onFetchedProjectData(projectAsset, loadingState);
                         this.props.onReceivedProjectTitle(projectTitle);
+                        this.props.onGoogleProjectLoaded(file.ownedByMe);
                     },
                     e => {
                         console.log(e);
@@ -139,9 +141,10 @@ const ProjectFetcherHOC = function (WrappedComponent) {
                 projectId,
                 reduxProjectId,
                 setProjectId: setProjectIdProp,
+                onReceivedProjectTitle,
+                onGoogleProjectLoaded,
                 /* eslint-enable no-unused-vars */
                 isFetchingWithId: isFetchingWithIdProp,
-                onReceivedProjectTitle,
                 ...componentProps
             } = this.props;
             return (
@@ -170,6 +173,7 @@ const ProjectFetcherHOC = function (WrappedComponent) {
         reduxProjectId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
         setProjectId: PropTypes.func,
         onReceivedProjectTitle: PropTypes.func,
+        onGoogleProjectLoaded: PropTypes.func
     };
     ProjectFetcherComponent.defaultProps = {
         assetHost: 'https://assets.scratch.mit.edu',
@@ -191,7 +195,8 @@ const ProjectFetcherHOC = function (WrappedComponent) {
             dispatch(onFetchedProjectData(projectData, loadingState)),
         setProjectId: projectId => dispatch(setProjectId(projectId)),
         onProjectUnchanged: () => dispatch(setProjectUnchanged()),
-        onReceivedProjectTitle: title => dispatch(setProjectTitle(title))
+        onReceivedProjectTitle: title => dispatch(setProjectTitle(title)),
+        onGoogleProjectLoaded: ownsProject => dispatch(googleLoadProject(ownsProject))
     });
     // Allow incoming props to override redux-provided props. Used to mock in tests.
     const mergeProps = (stateProps, dispatchProps, ownProps) => Object.assign(

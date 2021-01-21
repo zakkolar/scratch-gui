@@ -83,7 +83,7 @@ import {googleDriveLoaderMessages} from '../../containers/sb-file-google-loader.
 import Google from '../../Google.js';
 import MenuItemContainer from '../../containers/menu-item.jsx';
 
-import {googleDriveSignedIn, googleDriveName } from '../../reducers/google-drive';
+import {googleDriveSignedIn, googleDriveName, googleDriveOwnsProject} from '../../reducers/google-drive';
 
 
 const ariaMessages = defineMessages({
@@ -743,6 +743,7 @@ MenuBar.propTypes = {
 
     googleDriveSignedIn: PropTypes.bool,
     googleDriveName: PropTypes.string,
+    googleDriveOwnsProject: PropTypes.bool
 };
 
 MenuBar.defaultProps = {
@@ -765,8 +766,9 @@ const mapStateToProps = (state, ownProps) => {
         loginMenuOpen: loginMenuOpen(state),
         projectTitle: state.scratchGui.projectTitle,
         sessionExists: state.session && typeof state.session.session !== 'undefined',
-        userOwnsProject: ownProps.authorUsername && user &&
-            (ownProps.authorUsername === user.username),
+        // userOwnsProject: ownProps.authorUsername && user &&
+        //     (ownProps.authorUsername === user.username),
+        userOwnsProject: googleDriveOwnsProject(state),
         vm: state.scratchGui.vm,
         googleDriveAccountMenuOpen: googleDriveAccountMenuOpen(state),
         googleDriveSignedIn: googleDriveSignedIn(state),

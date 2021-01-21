@@ -176,7 +176,7 @@ export default class GoogleConnection {
 
     getFileInfo (fileId) {
         return new Promise((resolve, reject) => {
-            this.getGapi().client.drive.files.get({fileId}).then(response => {
+            this.getGapi().client.drive.files.get({fileId, fields: '*'}).then(response => {
                 if (response.status === 200){
                     resolve(response.result);
                 } else {
