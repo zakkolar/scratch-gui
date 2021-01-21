@@ -65,7 +65,7 @@ export default class GoogleConnection {
     showPicker (cb = () => {}){
         if (this.signedIn){
             if (this.pickerLoaded) {
-                const view = new google.picker.DocsView;
+                const view = new google.picker.DocsView();
                 view.setMode(this.getGoogle().picker.DocsViewMode.LIST);
                 // view.setMimeTypes('application/x.scratch.sb3');
                 view.setQuery('.sb3');
@@ -190,6 +190,14 @@ export default class GoogleConnection {
         });
     }
 
+    getScratchFolder (){
+        return new Promise((resolve, reject) => {
+            this.getGapi().client.drive.about.get({fields: '*'}).then(result => {
+                resolve(result.rootFolderId);
+            }, e => reject(e));
+        });
+    }
+
     downloadFile (id){
 
         return new Promise((resolve, reject) => {
@@ -213,6 +221,60 @@ export default class GoogleConnection {
             xhr.send();
 
         });
+    }
+
+    saveFile (id, body, params) {
+
+        return new Promise((resolve, reject) => {
+
+            const creatingProject = id === null || typeof id === 'undefined';
+
+            this.getScratchFolder().then(folderId => {
+
+
+                let fileSuffix = '';
+                let method = 'POST';
+
+                const mimeType = 'application/x-zip ';
+
+                if (!creatingProject) {
+                    fileSuffix = `/${id}`;
+                    method = 'PATCH';
+                }
+
+                const file = new Blob([body], {type: mimeType});
+                const metadata = {
+                    mimeType
+                };
+
+                if (params && params.title){
+                    metadata.name = `${params.title}.sb3`;
+                }
+
+                if (method === 'POST') {
+                    metadata.parents = [folderId];
+                }
+
+                const accessToken = this.getGapi().auth.getToken().access_token;
+                const form = new FormData();
+                form.append('metadata', new Blob([JSON.stringify(metadata)], {type: 'application/json'}));
+                form.append('file', file);
+
+                fetch(`https://www.googleapis.com/upload/drive/v3/files${fileSuffix}?uploadType=multipart&fields=id`, {
+                    method: method,
+                    headers: new Headers({Authorization: `Bearer ${accessToken}`}),
+                    body: form
+                }).then(res => res.json())
+                    .then(val => {
+                        console.log(val);
+                        resolve(val);
+                    });
+
+
+            }, e => reject(e));
+
+        });
+
     }
 
 }

@@ -33,6 +33,8 @@ import {
     getIsUpdating,
     projectError
 } from '../reducers/project-state';
+import {projectTitleInitialState} from "../reducers/project-title";
+import Google from "../Google";
 
 /**
  * Higher Order Component to provide behavior for saving projects.
@@ -219,45 +221,18 @@ const ProjectSaverHOC = function (WrappedComponent) {
         storeProject (projectId, requestParams) {
             requestParams = requestParams || {};
             this.clearAutoSaveTimeout();
-            // Serialize VM state now before embarking on
-            // the asynchronous journey of storing assets to
-            // the server. This ensures that assets don't update
-            // while in the process of saving a project (e.g. the
-            // serialized project refers to a newer asset than what
-            // we just finished saving).
-            const savedVMState = this.props.vm.toJSON();
-            return Promise.all(this.props.vm.assets
-                .filter(asset => !asset.clean)
-                .map(
-                    asset => storage.store(
-                        asset.assetType,
-                        asset.dataFormat,
-                        asset.data,
-                        asset.assetId
-                    ).then(response => {
-                        // Asset servers respond with {status: ok} for successful POSTs
-                        if (response.status !== 'ok') {
-                            // Errors include a `code` property, e.g. "Forbidden"
-                            return Promise.reject(response.code);
-                        }
-                        asset.clean = true;
-                    })
-                )
-            )
-                .then(() => this.props.onUpdateProjectData(projectId, savedVMState, requestParams))
-                .then(response => {
+
+            return this.props.saveProjectSb3().then(blob => {
+                return this.props.onUpdateGoogleProjectData(projectId, blob, requestParams).then(response => {
                     this.props.onSetProjectUnchanged();
-                    const id = response.id.toString();
-                    if (id && this.props.onUpdateProjectThumbnail) {
-                        this.storeProjectThumbnail(id);
-                    }
                     this.reportTelemetryEvent('projectDidSave');
                     return response;
                 })
-                .catch(err => {
-                    log.error(err);
-                    throw err; // pass the error up the chain
-                });
+                    .catch(err => {
+                        log.error(err);
+                        throw err;
+                    });
+            });
         }
 
         /**
@@ -342,6 +317,9 @@ const ProjectSaverHOC = function (WrappedComponent) {
                 reduxProjectId,
                 reduxProjectTitle,
                 setAutoSaveTimeoutId: setAutoSaveTimeoutIdProp,
+                projectFilename,
+                saveProjectSb3,
+                onUpdateGoogleProjectData,
                 /* eslint-enable no-unused-vars */
                 ...componentProps
             } = this.props;
@@ -395,15 +373,28 @@ const ProjectSaverHOC = function (WrappedComponent) {
         reduxProjectId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
         reduxProjectTitle: PropTypes.string,
         setAutoSaveTimeoutId: PropTypes.func.isRequired,
-        vm: PropTypes.instanceOf(VM).isRequired
+        vm: PropTypes.instanceOf(VM).isRequired,
+        projectFilename: PropTypes.string,
+        saveProjectSb3: PropTypes.func,
+        onUpdateGoogleProjectData: PropTypes.func
     };
     ProjectSaverComponent.defaultProps = {
         autoSaveIntervalSecs: 120,
         onRemixing: () => {},
         onSetProjectThumbnailer: () => {},
         onSetProjectSaver: () => {},
-        onUpdateProjectData: saveProjectToServer
+        onUpdateProjectData: saveProjectToServer,
+        onUpdateGoogleProjectData: (id, body) => Google.saveFile(id, body)
     };
+
+    const getProjectFilename = (curTitle, defaultTitle) => {
+        let filenameTitle = curTitle;
+        if (!filenameTitle || filenameTitle.length === 0) {
+            filenameTitle = defaultTitle;
+        }
+        return `${filenameTitle.substring(0, 100)}.sb3`;
+    };
+
     const mapStateToProps = (state, ownProps) => {
         const loadingState = state.scratchGui.projectState.loadingState;
         const isShowingWithId = getIsShowingWithId(loadingState);
@@ -424,7 +415,9 @@ const ProjectSaverHOC = function (WrappedComponent) {
             projectChanged: state.scratchGui.projectChanged,
             reduxProjectId: state.scratchGui.projectState.projectId,
             reduxProjectTitle: state.scratchGui.projectTitle,
-            vm: state.scratchGui.vm
+            vm: state.scratchGui.vm,
+            saveProjectSb3: state.scratchGui.vm.saveProjectSb3.bind(state.scratchGui.vm),
+            projectFilename: getProjectFilename(state.scratchGui.projectTitle, projectTitleInitialState)
         };
     };
     const mapDispatchToProps = dispatch => ({
