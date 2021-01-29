@@ -2,13 +2,10 @@ const defaultsDeep = require('lodash.defaultsdeep');
 var path = require('path');
 var webpack = require('webpack');
 
-var CONFIG = require('./config.js');
-
 // Plugins
 var CopyWebpackPlugin = require('copy-webpack-plugin');
 var HtmlWebpackPlugin = require('html-webpack-plugin');
 var UglifyJsPlugin = require('uglifyjs-webpack-plugin');
-var Dotenv = require('dotenv-webpack');
 
 // PostCss
 var autoprefixer = require('autoprefixer');
@@ -102,7 +99,8 @@ const base = {
                     GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
                     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID
                 }) :
-                JSON.stringify(CONFIG)
+                // eslint-disable-next-line global-require
+                JSON.stringify(require(path.join(__dirname, './config.js')))
         })
     ]
 };
