@@ -1,0 +1,4 @@
+export const CONFIG = {
+    GOOGLE_API_KEY: 'your api key',
+    GOOGLE_CLIENT_ID: 'your client id'
+};

@@ -2,6 +2,8 @@ const defaultsDeep = require('lodash.defaultsdeep');
 var path = require('path');
 var webpack = require('webpack');
 
+var CONFIG = require('./config.js');
+
 // Plugins
 var CopyWebpackPlugin = require('copy-webpack-plugin');
 var HtmlWebpackPlugin = require('html-webpack-plugin');
@@ -94,7 +96,14 @@ const base = {
         ]
     },
     plugins: [
-        new Dotenv()
+        new webpack.DefinePlugin({
+            'process.env': process.env.CONTEXT === 'production' ?
+                JSON.stringify({
+                    GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
+                    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID
+                }) :
+                JSON.stringify(CONFIG)
+        })
     ]
 };
 
